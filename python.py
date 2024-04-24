@@ -1,38 +1,54 @@
-import requests
-from bs4 import BeautifulSoup
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import time
 
-# Set up Selenium with Chrome browser
-chrome_options = Options()
-driver = webdriver.Chrome(options=chrome_options)
+def scrape_google_maps():
+    # Launch Chrome browser
+    driver = webdriver.Chrome()
 
-# Define the search URL for Google Maps
-search_url = "https://www.google.com/maps/search/restaurants+near+me"
+    # Open Google Maps centered on Denver with a search for restaurants
+    driver.get("https://www.google.com/maps/search/restaurants+near+me")
 
-# Fetch the search results page
-driver.get(search_url)
-time.sleep(5)  # Wait for 5 seconds
-html = driver.page_source
+    try:
+        # Wait for search box to appear
+        search_box = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input.tactile-searchbox-input"))
+        )
 
-# Parse the HTML with BeautifulSoup
-soup = BeautifulSoup(html, "html.parser")
+        # Search for restaurants in your desired location
+        search_box.send_keys("restaurants in [Denver, CO]")
+        search_box.send_keys(Keys.RETURN)
 
-# Find all the business listings
-business_listings = soup.find_all("div", class_="section-result")
+        # Wait for results to load
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.section-result"))
+        )
 
-# Loop through each business listing
-for listing in business_listings:
-    # Get the business name
-    business_name = listing.find("h3").text if listing.find("h3") else "Unknown"
+        # Simulate scrolling to the bottom of the page for 10 seconds
+        for _ in tqdm(range(10), desc="Scrolling"):
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(1)
 
-    # Check if the business has a website link
-    website_link = listing.find("a", class_="e07Vkf kA9KIf")
-    has_website = bool(website_link)
+        # Extract restaurant details
+        restaurant_cards = driver.find_elements_by_css_selector("div.section-result")
+        for card in restaurant_cards:
+            name = card.find_element_by_css_selector("h3").text
+            phone = card.find_element_by_css_selector("span[data-item-id='phone']").text
+            website = card.find_element_by_css_selector("div.section-result-details > div").get_attribute("innerHTML")
+            # Extracting store hours may require additional logic
 
-    if not has_website:
-        print(f"Business: {business_name} (No website found)")
+            # Print restaurant details
+            print("Name:", name)
+            print("Phone:", phone)
+            print("Website:", website)
+            print("-----------------------")
 
-# Close the browser
-driver.quit()
+    finally:
+        # Close the browser
+        driver.quit()
+
+if __name__ == "__main__":
+    scrape_google_maps()
